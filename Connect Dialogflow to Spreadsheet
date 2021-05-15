@@ -1,0 +1,115 @@
+
+'use strict';
+ 
+const functions = require('firebase-functions');
+const admin  = require('firebase-admin');
+const {WebhookClient} = require('dialogflow-fulfillment');
+const {Card, Suggestion} = require('dialogflow-fulfillment');
+const axios = require('axios');
+
+admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      databaseURL: 'ws://jarvis-erem-default-rtdb.firebaseio.com/'
+});
+
+
+
+ 
+process.env.DEBUG = 'dialogflow:debug'; // enables lib debugging statements
+ 
+exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, response) => {
+  const agent = new WebhookClient({ request, response });
+  console.log('Dialogflow Request headers: ' + JSON.stringify(request.headers));
+  console.log('Dialogflow Request body: ' + JSON.stringify(request.body));
+ 
+  function welcome(agent) {
+    agent.add(`Welcome to my agent!`);
+  }
+ 
+  function fallback(agent) {
+    agent.add(`I didn't understand`);
+    agent.add(`I'm sorry, can you try again?`);
+  }
+
+  function GetStudentName(){
+    return axios.get('https://sheetdb.io/api/v1/8v0cvf2iim3ba');
+  }
+  
+  function handleName(agent) {
+  	const name = agent.parameters.name;
+    return GetStudentName().then(res => {
+    	res.data.map(person => {
+            if(person.Name === name)
+        	agent.add(`Here are the details for ${name}. \n Course: ${person.Course}, \n Enrollment: ${person.Enrollment},\n Semester: ${person.Semester}, \n CGPA: ${person.CGPA}`);
+        });
+    });
+  }
+  
+   function handleSaveDetails(agent){
+   const {
+    	name, course, enrollment, semester,cgpa
+    } = agent.parameters;
+    
+    const data = [{
+      Name: name,
+      Course: course,
+      Enrollment: enrollment,
+      Semester: semester,
+      CGPA: cgpa
+    }];
+    axios.post('https://sheet.best/api/sheets/6c95e6e6-0321-44f5-98b7-46515bd8fbf1', data);
+  }
+   
+ 
+    function GetTime(){
+    return axios.get('https://sheetdb.io/api/v1/ymjcfl9ug1zhl');
+  }
+  
+  function handleTime(agent) {
+  	const time = agent.parameters.time;
+    return GetTime().then(res => {
+    	res.data.map(person => {
+            if(person.DAY === time)
+        	agent.add(`Here is the Time Table for ${time}. 1: ${person.SUB1}, \n 2: ${person.SUB2},\n 3: ${person.SUB3}`);
+        });
+    });
+  }
+  
+  
+  function GetHoliday(){
+    return axios.get('https://sheetdb.io/api/v1/r20uikno0z0qw');
+  }
+  function handleHoliday(agent) {
+  	const holiday = agent.parameters.holiday;
+    return GetHoliday().then(res => {
+    	res.data.map(person => {
+            if(person.Month === holiday)
+        	agent.add(`Here are the Holiday list for ${holiday}. \n ${person.h1},\n ${person.h2},\n ${person.h3},\n ${person.h4},\n ${person.h5}`);
+        });
+    });
+  }
+    
+  
+   function Subjectdetails(){
+    return axios.get('https://sheetdb.io/api/v1/l340klw851oqc');
+  }
+   function handleCourse(agent) {
+  	const course = agent.parameters.course;
+    return Subjectdetails().then(res => {
+    	res.data.map(person => {
+            if(person.Course === course)
+        	agent.add(`Here are the Course Details for ${course}. \n 1: ${person.sub1},\n 2: ${person.sub2},\n 3: ${person.sub3},\n 4: ${person.sub4},\n 5: ${person.sub5},\n 6: ${person.sub6},\n 7: ${person.sub7},\n 8: ${person.sub8}`);
+        });
+    });
+  }
+  
+  let intentMap = new Map();
+  intentMap.set('Default Welcome Intent', welcome);
+  intentMap.set('Default Fallback Intent', fallback);
+  intentMap.set('GetTime', handleTime	);
+  intentMap.set('GetStudentName', handleName);
+  intentMap.set('SaveDetails', handleSaveDetails);
+  intentMap.set('GetHoliday',handleHoliday);
+  intentMap.set('Subjectdetails',handleCourse);
+  agent.handleRequest(intentMap);
+});
